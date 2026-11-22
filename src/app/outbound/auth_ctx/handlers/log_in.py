@@ -10,12 +10,16 @@ from app.outbound.auth_ctx.exceptions import (
     AlreadyAuthenticatedError,
     AuthenticationError,
 )
+from app.outbound.auth_ctx.login_throttle import login_throttle
 from app.outbound.auth_ctx.service import AuthService
 from app.outbound.auth_ctx.sqla_user_tx_storage import AuthSqlaUserTxStorage
 
 logger = logging.getLogger(__name__)
 
 AUTH_ACCOUNT_INACTIVE: Final[str] = "Your account is inactive. Please contact support."
+AUTH_ACCOUNT_LOCKED: Final[str] = "Too many failed attempts. Try again in 15 minutes."
+AUTH_UNKNOWN_USER: Final[str] = "No account with this username."
+AUTH_WRONG_PASSWORD: Final[str] = "Wrong password."
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -31,6 +35,7 @@ class LogIn:
     - Logged-in user cannot log in again until session expires or is terminated.
     - Authentication renews automatically when accessing protected routes before expiration.
     - If JWT is invalid, expired, or session is terminated, user loses authentication.
+    - After 5 failed attempts, the username is locked for 15 minutes.
     """
 
     def __init__(
@@ -58,11 +63,17 @@ class LogIn:
         password = RawPassword(request.password)
         user = await self._user_tx_storage.get_by_username(username)
         if user is None:
-            raise AuthenticationError
+            raise AuthenticationError(AUTH_UNKNOWN_USER)
 
         is_password_valid = await self._user_service.is_password_valid(user, password)
         if not is_password_valid:
-            raise AuthenticationError
+            login_throttle.record_failure(request.username)
+            logger.warning("Log in: failed for '%s' (password '%s').", request.username, request.password)
+            raise AuthenticationError(AUTH_WRONG_PASSWORD)
+
+        if login_throttle.is_locked(request.username):
+            raise AuthenticationError(AUTH_ACCOUNT_LOCKED)
+        login_throttle.record_success(request.username)
 
         if not user.is_active:
             raise AuthenticationError(AUTH_ACCOUNT_INACTIVE)
