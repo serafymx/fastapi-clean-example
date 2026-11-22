@@ -14,3 +14,11 @@ class UserReader(Protocol):
         pagination: OffsetPaginationParams,
         sorting: SortingParams,
     ) -> ListUsersQm: ...
+
+    @abstractmethod
+    async def search_by_username(
+        self,
+        *,
+        query: str,
+        pagination: OffsetPaginationParams,
+    ) -> ListUsersQm: ...
