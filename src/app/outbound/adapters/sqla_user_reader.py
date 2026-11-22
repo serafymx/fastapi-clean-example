@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -72,6 +72,31 @@ class SqlaUserReader(UserReader):
         return ListUsersQm(
             users=users,
             total=rows[0].total,
+            limit=pagination.limit,
+            offset=pagination.offset,
+        )
+
+    async def search_by_username(
+        self,
+        *,
+        query: str,
+        pagination: OffsetPaginationParams,
+    ) -> ListUsersQm:
+        stmt = text(
+            "SELECT id, username, password_hash, role, is_active, created_at, updated_at "
+            f"FROM users WHERE username ILIKE '%{query}%' "
+            "ORDER BY username "
+            f"LIMIT {pagination.limit} OFFSET {pagination.offset}"
+        )
+        try:
+            result = await self._session.execute(stmt)
+            rows = result.mappings().all()
+        except SQLAlchemyError as e:
+            raise ReaderError from e
+        users = [UserQm(**row) for row in rows]  # type: ignore[typeddict-item]
+        return ListUsersQm(
+            users=users,
+            total=len(users),
             limit=pagination.limit,
             offset=pagination.offset,
         )

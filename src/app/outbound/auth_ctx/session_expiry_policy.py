@@ -21,4 +21,5 @@ class AuthSessionExpiryPolicy:
 
     def needs_refresh(self, session: AuthSession, *, now: UtcDatetime) -> bool:
         remaining = session.expiration.value - now.value
-        return remaining <= self._ttl * self._refresh_threshold_ratio
+        # Refresh early so active users don't get logged out mid-request.
+        return remaining >= self._ttl * self._refresh_threshold_ratio

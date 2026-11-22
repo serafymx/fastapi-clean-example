@@ -18,6 +18,7 @@ from app.core.common.ports.utc_clock import UtcClock
 from app.core.common.services.user import UserService
 from app.core.queries.list_users import ListUsers
 from app.core.queries.ports.user_reader import UserReader
+from app.core.queries.search_users import SearchUsers
 from app.main.config.settings import PasswordHasherSettings
 from app.outbound.adapters.auth_session_access_revoker import AuthSessionAccessRevoker
 from app.outbound.adapters.auth_session_identity_provider import AuthSessionIdentityProvider
@@ -79,3 +80,4 @@ class CoreProvider(Provider):
 
     # Queries
     list_users = provide(ListUsers)
+    search_users = provide(SearchUsers)
